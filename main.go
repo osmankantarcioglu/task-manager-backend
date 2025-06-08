@@ -22,6 +22,7 @@ func main() {
 	app := fiber.New()
 
 	app.Post("/register", handlers.Register)
+	app.Post("/login", handlers.Login)
 
 	app.Listen(":3000")
 }
