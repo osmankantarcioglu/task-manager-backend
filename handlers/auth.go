@@ -1,13 +1,14 @@
 package handlers
 
 import (
+	"os"
+	"time"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/osmankantarcioglu/task-manager-backend/database"
 	"github.com/osmankantarcioglu/task-manager-backend/models"
 	"golang.org/x/crypto/bcrypt"
-	"os"
-	"time"
 )
 
 type RegisterInput struct {
@@ -97,6 +98,9 @@ func Login(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"token": signedToken,
+		"user": fiber.Map{
+			"id":       user.ID,
+			"username": user.Username,
+		},
 	})
-
 }

@@ -19,24 +19,28 @@ func main() {
 	}
 
 	database.Connect()
-	database.DB.AutoMigrate(&models.User{}) //
+	database.DB.AutoMigrate(&models.User{})
 	database.DB.AutoMigrate(&models.Task{})
 
 	app := fiber.New()
 
-	// Add CORS middleware
+	// Add CORS middleware with secure configuration
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: "http://localhost:3000",
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 		AllowMethods: "GET, POST, PUT, DELETE",
 	}))
 
+	// Auth routes
 	app.Post("/register", handlers.Register)
 	app.Post("/login", handlers.Login)
+
+	// Task routes (all protected)
 	app.Post("/tasks", middleware.Protected(), handlers.CreateTask)
 	app.Get("/tasks", middleware.Protected(), handlers.GetTasks)
 	app.Put("/tasks/:id", middleware.Protected(), handlers.UpdateTask)
 	app.Delete("/tasks/:id", middleware.Protected(), handlers.DeleteTask)
+	app.Put("/tasks/reorder", middleware.Protected(), handlers.ReorderTasks)
 
 	log.Println("Server starting on port 8080...")
 	app.Listen(":8080")

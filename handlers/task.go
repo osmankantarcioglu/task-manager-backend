@@ -12,6 +12,8 @@ func CreateTask(c *fiber.Ctx) error {
 	type TaskInput struct {
 		Title       string `json:"title"`
 		Description string `json:"description"`
+		Done        bool   `json:"done"`
+		Position    int    `json:"position"`
 	}
 
 	var taskInput TaskInput
@@ -25,7 +27,8 @@ func CreateTask(c *fiber.Ctx) error {
 		Title:       taskInput.Title,
 		Description: taskInput.Description,
 		UserID:      userID,
-		Done:        false,
+		Done:        taskInput.Done,
+		Position:    taskInput.Position,
 	}
 
 	if err := database.DB.Create(&task).Error; err != nil {
@@ -34,14 +37,13 @@ func CreateTask(c *fiber.Ctx) error {
 		})
 	}
 	return c.JSON(task)
-
 }
 
 func GetTasks(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(uint)
 
 	var tasks []models.Task
-	if err := database.DB.Where("user_id = ?", userID).Find(&tasks).Error; err != nil {
+	if err := database.DB.Where("user_id = ?", userID).Order("position").Find(&tasks).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": err.Error(),
 		})
@@ -65,6 +67,7 @@ func UpdateTask(c *fiber.Ctx) error {
 		Title       string `json:"title"`
 		Description string `json:"description"`
 		Done        *bool  `json:"done"`
+		Position    *int   `json:"position"`
 	}
 
 	var input UpdateInput
@@ -74,7 +77,6 @@ func UpdateTask(c *fiber.Ctx) error {
 		})
 	}
 
-	// Sadece gelen alanları güncelle
 	if input.Title != "" {
 		task.Title = input.Title
 	}
@@ -83,6 +85,9 @@ func UpdateTask(c *fiber.Ctx) error {
 	}
 	if input.Done != nil {
 		task.Done = *input.Done
+	}
+	if input.Position != nil {
+		task.Position = *input.Position
 	}
 
 	if err := database.DB.Save(&task).Error; err != nil {
@@ -113,5 +118,53 @@ func DeleteTask(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"message": "Task deleted",
+	})
+}
+
+func ReorderTasks(c *fiber.Ctx) error {
+	userID := c.Locals("userID").(uint)
+
+	type ReorderInput struct {
+		TaskIDs []uint `json:"taskIds"`
+	}
+
+	var input ReorderInput
+	if err := c.BodyParser(&input); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	// Start a transaction
+	tx := database.DB.Begin()
+
+	// Update positions for each task
+	for position, taskID := range input.TaskIDs {
+		var task models.Task
+		if err := tx.First(&task, "id = ? AND user_id = ?", taskID, userID).Error; err != nil {
+			tx.Rollback()
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "Task not found",
+			})
+		}
+
+		task.Position = position
+		if err := tx.Save(&task).Error; err != nil {
+			tx.Rollback()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		}
+	}
+
+	// Commit the transaction
+	if err := tx.Commit().Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Tasks reordered successfully",
 	})
 }

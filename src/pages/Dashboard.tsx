@@ -23,7 +23,8 @@ import {
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
-import axios from 'axios';
+import api from '../api/axios';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Task {
   id: string;
@@ -34,6 +35,7 @@ interface Task {
 }
 
 const Dashboard = () => {
+  const { isAuthenticated } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -48,19 +50,28 @@ const Dashboard = () => {
 
   const fetchTasks = async () => {
     try {
-      const response = await axios.get('/api/tasks');
+      console.log('Fetching tasks...');
+      const token = localStorage.getItem('token');
+      console.log('Current token:', token);
+      
+      const response = await api.get('/tasks');
+      console.log('Tasks response:', response.data);
+      
       setTasks(response.data.sort((a: Task, b: Task) => a.position - b.position));
       setError('');
-    } catch (err) {
-      setError('Failed to load tasks');
+    } catch (err: any) {
+      console.error('Error fetching tasks:', err.response || err);
+      setError('Failed to load tasks: ' + (err.response?.data?.message || err.message));
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchTasks();
-  }, []);
+    if (isAuthenticated) {
+      fetchTasks();
+    }
+  }, [isAuthenticated]);
 
   const handleOpenModal = (task?: Task) => {
     if (task) {
@@ -87,33 +98,55 @@ const Dashboard = () => {
 
   const handleSubmit = async () => {
     try {
+      console.log('Submitting task...');
       if (editingTask) {
-        await axios.put(`/api/tasks/${editingTask.id}`, {
+        const response = await api.put(`/tasks/${editingTask.id}`, {
           title,
           description,
           done,
+          position: editingTask.position
         });
+        console.log('Update task response:', response.data);
       } else {
-        await axios.post('/api/tasks', {
+        const position = tasks.length > 0 ? Math.max(...tasks.map(t => t.position)) + 1 : 0;
+        const response = await api.post('/tasks', {
           title,
           description,
           done,
-          position: tasks.length,
+          position
         });
+        console.log('Create task response:', response.data);
       }
-      fetchTasks();
+      await fetchTasks();
       handleCloseModal();
-    } catch (err) {
-      setError('Failed to save task');
+      setError('');
+    } catch (err: any) {
+      console.error('Error saving task:', err.response || err);
+      setError('Failed to save task: ' + (err.response?.data?.message || err.message));
     }
   };
 
   const handleDelete = async (taskId: string) => {
     try {
-      await axios.delete(`/api/tasks/${taskId}`);
-      fetchTasks();
-    } catch (err) {
-      setError('Failed to delete task');
+      await api.delete(`/tasks/${taskId}`);
+      const updatedTasks = tasks
+        .filter(t => t.id !== taskId)
+        .map((task, index) => ({
+          ...task,
+          position: index
+        }));
+      
+      if (updatedTasks.length > 0) {
+        await api.put('/tasks/reorder', {
+          taskIds: updatedTasks.map(task => task.id)
+        });
+      }
+      
+      await fetchTasks();
+      setError('');
+    } catch (err: any) {
+      console.error('Error deleting task:', err.response || err);
+      setError('Failed to delete task: ' + (err.response?.data?.message || err.message));
     }
   };
 
@@ -132,7 +165,7 @@ const Dashboard = () => {
     setTasks(updatedTasks);
 
     try {
-      await axios.put('/api/tasks/reorder', {
+      await api.put('/tasks/reorder', {
         taskIds: updatedTasks.map(task => task.id),
       });
     } catch (err) {
@@ -217,13 +250,17 @@ const Dashboard = () => {
                                 checked={task.done}
                                 onChange={async () => {
                                   try {
-                                    await axios.put(`/api/tasks/${task.id}`, {
-                                      ...task,
+                                    await api.put(`/tasks/${task.id}`, {
+                                      title: task.title,
+                                      description: task.description,
                                       done: !task.done,
+                                      position: task.position
                                     });
-                                    fetchTasks();
-                                  } catch (err) {
-                                    setError('Failed to update task status');
+                                    await fetchTasks();
+                                    setError('');
+                                  } catch (err: any) {
+                                    console.error('Error updating task status:', err.response || err);
+                                    setError('Failed to update task status: ' + (err.response?.data?.message || err.message));
                                   }
                                 }}
                               />
