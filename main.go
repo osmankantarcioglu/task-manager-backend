@@ -28,6 +28,7 @@ func main() {
 	app.Post("/tasks", middleware.Protected(), handlers.CreateTask)
 	app.Get("/tasks", middleware.Protected(), handlers.GetTasks)
 	app.Put("/tasks/:id", middleware.Protected(), handlers.UpdateTask)
+	app.Delete("/tasks/:id", middleware.Protected(), handlers.DeleteTask)
 
 	app.Listen(":3000")
 }
