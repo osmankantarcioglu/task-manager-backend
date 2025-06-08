@@ -26,6 +26,7 @@ func main() {
 	app.Post("/register", handlers.Register)
 	app.Post("/login", handlers.Login)
 	app.Post("/tasks", middleware.Protected(), handlers.CreateTask)
+	app.Get("/tasks", middleware.Protected(), handlers.GetTasks)
 
 	app.Listen(":3000")
 }

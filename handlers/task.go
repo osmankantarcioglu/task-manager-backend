@@ -36,3 +36,16 @@ func CreateTask(c *fiber.Ctx) error {
 	return c.JSON(task)
 
 }
+
+func GetTasks(c *fiber.Ctx) error {
+	userID := c.Locals("userID").(uint)
+
+	var tasks []models.Task
+	if err := database.DB.Where("user_id = ?", userID).Find(&tasks).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(tasks)
+}
