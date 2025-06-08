@@ -5,6 +5,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/osmankantarcioglu/task-manager-backend/database"
 	"github.com/osmankantarcioglu/task-manager-backend/handlers"
+	"github.com/osmankantarcioglu/task-manager-backend/middleware"
 	"github.com/osmankantarcioglu/task-manager-backend/models"
 	"log"
 )
@@ -18,11 +19,13 @@ func main() {
 
 	database.Connect()
 	database.DB.AutoMigrate(&models.User{}) //
+	database.DB.AutoMigrate(&models.Task{})
 
 	app := fiber.New()
 
 	app.Post("/register", handlers.Register)
 	app.Post("/login", handlers.Login)
+	app.Post("/tasks", middleware.Protected(), handlers.CreateTask)
 
 	app.Listen(":3000")
 }
